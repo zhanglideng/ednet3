@@ -14,7 +14,7 @@ import xlwt
 from utils.ms_ssim import *
 import os
 
-LR = 0.0004  # 学习率
+LR = 0.004  # 学习率
 EPOCH = 100  # 轮次
 BATCH_SIZE = 4  # 批大小
 excel_train_line = 1  # train_excel写入的行的下标
@@ -157,9 +157,9 @@ for epoch in range(EPOCH):
             dehaze_image, hazy_scene_feature = net(input_image)
             val_ed_ssim_loss += ssim_loss(output_image, gt_image).item()
             val_ed_l2_loss += l2_loss(output_image, gt_image).item()
-            val_l2_sf_loss += l2_loss(gt_scene_feature, hazy_scene_feature).item
-            val_dehaze_l2_loss += l2_loss(output_image, dehaze_image)
-            val_dehaze_ssim_loss += ssim_loss(output_image, dehaze_image)
+            val_l2_sf_loss += l2_loss(gt_scene_feature, hazy_scene_feature).item()
+            val_dehaze_l2_loss += l2_loss(output_image, dehaze_image).item()
+            val_dehaze_ssim_loss += ssim_loss(output_image, dehaze_image).item()
     train_epo_loss = train_epo_loss / len(train_data_loader)
     val_ed_ssim_loss = val_ed_ssim_loss / len(validation_data_loader)
     val_ed_l2_loss = val_ed_l2_loss / len(validation_data_loader)
@@ -167,7 +167,7 @@ for epoch in range(EPOCH):
     val_dehaze_l2_loss = val_dehaze_l2_loss / len(validation_data_loader)
     val_dehaze_ssim_loss = val_dehaze_ssim_loss / len(validation_data_loader)
     print('\nepoch %d train loss = %.5f' % (epoch + 1, train_epo_loss))
-    print('epoch %d validation loss = %.5f' % (epoch + 1, alpha * val_ssim_loss + val_l2_loss + val_l2_sf_loss))
+    print('epoch %d validation loss = %.5f' % (epoch + 1, alpha * val_ed_ssim_loss + val_ed_l2_loss + val_l2_sf_loss))
     print('epoch %d dehaze l2 loss = %.5f' % (epoch + 1, val_dehaze_l2_loss))
     print('epoch %d dehaze ssim loss = %.5f' % (epoch + 1, val_dehaze_ssim_loss))
     # val=["EPOCH", "L2_LOSS", "SSIM_LOSS", "LOSS", "PSNR", "SSIM", "LR"]
