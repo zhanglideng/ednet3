@@ -3,6 +3,7 @@
     <words>
       <w>conv</w>
       <w>deconv</w>
+      <w>dehaze</w>
       <w>dehazy</w>
       <w>maxpool</w>
       <w>nepoch</w>

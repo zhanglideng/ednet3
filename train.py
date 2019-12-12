@@ -14,20 +14,20 @@ import xlwt
 from utils.ms_ssim import *
 import os
 
-LR = 0.004  # 学习率
-EPOCH = 20  # 轮次
-BATCH_SIZE = 8  # 批大小
+LR = 0.0004  # 学习率
+EPOCH = 100  # 轮次
+BATCH_SIZE = 4  # 批大小
 excel_train_line = 1  # train_excel写入的行的下标
 excel_val_line = 1  # val_excel写入的行的下标
 alpha = 1  # 损失函数的权重
 accumulation_steps = 1  # 梯度积累的次数，类似于batch-size=64
 itr_to_lr = 10000 // BATCH_SIZE  # 训练10000次后损失下降50%
 itr_to_excel = 64 // BATCH_SIZE  # 训练64次后保存相关数据到excel
-train_path = './data/train/'  # 训练集的路径
-validation_path = './data/val/'  # 验证集的路径
+train_haze_path = './dehaze_data/train/'  # 去雾训练集的路径
+val_haze_path = './dehaze_data/val/'  # 去雾验证集的路径
+gt_path = './dehaze_data/gth/'
 save_path = './checkpoints/best_cnn_model.pt'  # 保存模型的路径
 excel_save = './result.xls'  # 保存excel的路径
-loss_select = 'ssim'
 
 
 def adjust_learning_rate(op, i):
@@ -40,24 +40,25 @@ def adjust_learning_rate(op, i):
 # 初始化excel
 f, sheet_train, sheet_val = init_excel()
 # 加载模型
-# if not os.path.exists(save_path):
-net = CNN(64)
-# else:
-#    net = torch.load(save_path)
+model_path = './checkpoints/best_cnn_model.pt'
+net = torch.load(model_path)
 net = net.cuda()
-
 print(net)
-# print(net.named_parameters())
+for param in net.decoder.parameters():
+    param.requires_grad = False
+
 # 数据转换模式
 transform = transforms.Compose([transforms.ToTensor()])
 # transform = transforms.Compose(
 #    [transforms.ToTensor(), transforms.Normalize(mean=[0.489, 0.490, 0.491], std=[0.312, 0.312, 0.312])])
 # 读取训练集数据
-train_data = EdDataSet(transform, train_path, batch_size=BATCH_SIZE)
+train_path_list = [train_haze_path, gt_path]
+train_data = EdDataSet(transform, train_path_list)
 train_data_loader = DataLoader(train_data, batch_size=BATCH_SIZE, shuffle=True, num_workers=8)
 
 # 读取验证集数据
-validation_data = EdDataSet(transform, validation_path, batch_size=BATCH_SIZE)
+val_path_list = [val_haze_path, gt_path]
+validation_data = EdDataSet(transform, val_path_list)
 validation_data_loader = DataLoader(validation_data, batch_size=BATCH_SIZE, shuffle=True, num_workers=8)
 
 # 定义优化器
@@ -74,26 +75,29 @@ for epoch in range(EPOCH):
     train_epo_loss = 0
     validation_epo_loss = 0
     l2_loss_excel = 0
+    l2_sf_loss_excel = 0
     ssim_loss_excel = 0
-    net.train()
     for input_image, gt_image in train_data_loader:
         index += 1
         itr += 1
         input_image = input_image.cuda()
         gt_image = gt_image.cuda()
-        output_image, scene_feature = net(input_image)
+        output_image, gt_scene_feature = net(gt_image)
+        hazy_scene_feature = net.encoder(input_image)
         l2 = l2_loss(output_image, gt_image)
+        l2_sf = l2_loss(gt_scene_feature, hazy_scene_feature)
         ssim = ssim_loss(output_image, gt_image)
-        loss = ssim
-        print(ssim.item())
+        loss = ssim + l2 + l2_sf
         l2_loss_excel += l2.item()
+        l2_sf_loss_excel += l2_sf.item()
         ssim_loss_excel += ssim.item()
         loss.backward()
         # optimizer.step()
         iter_loss = loss.item()
         train_epo_loss += iter_loss
         loss = loss / accumulation_steps
-        adjust_learning_rate(optimizer, itr)
+        if itr % itr_to_lr == 0:
+            adjust_learning_rate(optimizer, itr)
         # 3. update parameters of net
         if ((index + 1) % accumulation_steps) == 0:
             # optimizer the net
@@ -102,8 +106,9 @@ for epoch in range(EPOCH):
         if np.mod(index, itr_to_excel) == 0:
             # print(index)
             # print(itr_to_excel)
-            print('epoch %d, %03d/%d, l2_loss=%.5f, ssim_loss=%.5f' % (
-                epoch + 1, index, len(train_data_loader), l2_loss_excel / itr_to_excel, ssim_loss_excel / itr_to_excel))
+            print('epoch %d, %03d/%d, l2_loss=%.5f, ssim_loss=%.5f, l2_sf_loss=%.5f' % (
+                epoch + 1, index, len(train_data_loader), l2_loss_excel / itr_to_excel, ssim_loss_excel / itr_to_excel,
+                l2_sf_loss_excel / itr_to_excel))
             print_time(start_time, index, EPOCH, len(train_data_loader), epoch)
             # train=["EPOCH", "ITR", "L2_LOSS", "SSIM_LOSS", "LOSS", "LR"]
             # (sheet, data_type, line, epoch, itr, l2_loss, ssim_loss, loss, psnr, ssim, lr)
@@ -114,30 +119,57 @@ for epoch in range(EPOCH):
                                            itr=itr,
                                            l2_loss=l2_loss_excel / itr_to_excel,
                                            ssim_loss=ssim_loss_excel / itr_to_excel,
+                                           l2_sf_loss=l2_sf_loss_excel / itr_to_excel,
+                                           dehaze_l2_loss=False,
+                                           dehaze_ssim_loss=False,
                                            loss=(alpha * ssim_loss_excel + l2_loss_excel) / itr_to_excel,
                                            lr=LR * (0.90 ** (itr // itr_to_lr)))
             f.save(excel_save)
             l2_loss_excel = 0
             ssim_loss_excel = 0
+            l2_sf_loss_excel = 0
     optimizer.step()
     optimizer.zero_grad()
     # 验证集的损失计算
-    val_ssim_loss = 0
-    val_l2_loss = 0
+    val_ed_ssim_loss = 0
+    val_ed_l2_loss = 0
+    val_l2_sf_loss = 0
+    val_dehaze_l2_loss = 0
+    val_dehaze_ssim_loss = 0
     with torch.no_grad():
-        net.eval()
         for input_image, gt_image in validation_data_loader:
             # input_image = item['input_image']
+
+            """
             input_image = input_image.cuda()
             gt_image = gt_image.cuda()
-            output_image, scene_feature = net(input_image)
-            val_ssim_loss += ssim_loss(output_image, gt_image).item()
-            val_l2_loss += l2_loss(output_image, gt_image).item()
+            output_image, gt_scene_feature = net(gt_image)
+            hazy_scene_feature = net.encoder(input_image)
+            l2 = l2_loss(output_image, gt_image)
+            l2_sf = l2_loss(gt_scene_feature, hazy_scene_feature)
+            ssim = ssim_loss(output_image, gt_image)
+            loss = ssim + l2 + l2_sf
+            """
+
+            input_image = input_image.cuda()
+            gt_image = gt_image.cuda()
+            output_image, gt_scene_feature = net(input_image)
+            dehaze_image, hazy_scene_feature = net(input_image)
+            val_ed_ssim_loss += ssim_loss(output_image, gt_image).item()
+            val_ed_l2_loss += l2_loss(output_image, gt_image).item()
+            val_l2_sf_loss += l2_loss(gt_scene_feature, hazy_scene_feature).item
+            val_dehaze_l2_loss += l2_loss(output_image, dehaze_image)
+            val_dehaze_ssim_loss += ssim_loss(output_image, dehaze_image)
     train_epo_loss = train_epo_loss / len(train_data_loader)
-    val_ssim_loss = val_ssim_loss / len(validation_data_loader)
-    val_l2_loss = val_l2_loss / len(validation_data_loader)
+    val_ed_ssim_loss = val_ed_ssim_loss / len(validation_data_loader)
+    val_ed_l2_loss = val_ed_l2_loss / len(validation_data_loader)
+    val_l2_sf_loss = val_l2_sf_loss / len(validation_data_loader)
+    val_dehaze_l2_loss = val_dehaze_l2_loss / len(validation_data_loader)
+    val_dehaze_ssim_loss = val_dehaze_ssim_loss / len(validation_data_loader)
     print('\nepoch %d train loss = %.5f' % (epoch + 1, train_epo_loss))
-    print('epoch %d validation loss = %.5f' % (epoch + 1, alpha * val_ssim_loss + val_l2_loss))
+    print('epoch %d validation loss = %.5f' % (epoch + 1, alpha * val_ssim_loss + val_l2_loss + val_l2_sf_loss))
+    print('epoch %d dehaze l2 loss = %.5f' % (epoch + 1, val_dehaze_l2_loss))
+    print('epoch %d dehaze ssim loss = %.5f' % (epoch + 1, val_dehaze_ssim_loss))
     # val=["EPOCH", "L2_LOSS", "SSIM_LOSS", "LOSS", "PSNR", "SSIM", "LR"]
     # (sheet, data_type, line, epoch, itr, l2_loss, ssim_loss, loss, psnr, ssim, lr)
     excel_val_line = write_excel(sheet=sheet_val,
@@ -147,12 +179,15 @@ for epoch in range(EPOCH):
                                  itr=False,
                                  l2_loss=val_l2_loss,
                                  ssim_loss=val_ssim_loss,
-                                 loss=alpha * val_ssim_loss,
+                                 l2_sf_loss=val_l2_sf_loss,
+                                 dehaze_ssim_loss=val_dehaze_ssim_loss,
+                                 dehaze_l2_loss=val_dehaze_l2_loss,
+                                 loss=alpha * val_ssim_loss + val_l2_loss + val_l2_sf_loss,
                                  lr=LR * (0.90 ** (itr // itr_to_lr)))
     f.save(excel_save)
     # if alpha * val_ssim_loss + val_l2_loss < min_loss:
-    if alpha * val_ssim_loss < min_loss:
-        min_loss = alpha * val_ssim_loss
+    if alpha * val_ssim_loss + val_l2_sf_loss + val_l2_loss < min_loss:
+        min_loss = alpha * val_ssim_loss + val_l2_sf_loss + val_l2_loss
         min_epoch = epoch
         torch.save(net, save_path)
         print('saving the epoch %d model with %.5f' % (epoch + 1, min_loss))
