@@ -16,7 +16,7 @@ import os
 
 LR = 0.0004  # 学习率
 EPOCH = 100  # 轮次
-BATCH_SIZE = 4  # 批大小
+BATCH_SIZE = 2  # 批大小
 excel_train_line = 1  # train_excel写入的行的下标
 excel_val_line = 1  # val_excel写入的行的下标
 alpha = 1  # 损失函数的权重
@@ -50,8 +50,6 @@ for param in net.decoder.parameters():
 
 # 数据转换模式
 transform = transforms.Compose([transforms.ToTensor()])
-# transform = transforms.Compose(
-#    [transforms.ToTensor(), transforms.Normalize(mean=[0.489, 0.490, 0.491], std=[0.312, 0.312, 0.312])])
 # 读取训练集数据
 train_path_list = [train_haze_path, gt_path]
 train_data = EdDataSet(transform, train_path_list)
@@ -59,8 +57,8 @@ train_data_loader = DataLoader(train_data, batch_size=BATCH_SIZE, shuffle=True, 
 
 # 读取验证集数据
 val_path_list = [val_haze_path, gt_path]
-validation_data = EdDataSet(transform, val_path_list)
-validation_data_loader = DataLoader(validation_data, batch_size=BATCH_SIZE, shuffle=True, num_workers=4)
+val_data = EdDataSet(transform, val_path_list)
+val_data_loader = DataLoader(val_data, batch_size=BATCH_SIZE, shuffle=True, num_workers=4)
 
 # 定义优化器
 optimizer = torch.optim.Adam(net.parameters(), lr=LR, weight_decay=1e-5)
@@ -75,17 +73,8 @@ print("\nstart to train!")
 for epoch in range(EPOCH):
     index = 0
     train_epo_loss = 0
-    validation_epo_loss = 0
-    '''
-    l2_loss_excel = 0
-    l2_sf_loss_excel = 0
-    ssim_loss_excel = 0
-    '''
     loss = 0
     loss_excel = [0] * loss_num
-    """
-    创建一个可以
-    """
     for input_image, gt_image in train_data_loader:
         index += 1
         itr += 1
@@ -143,53 +132,42 @@ for epoch in range(EPOCH):
                                            epoch=epoch,
                                            itr=itr,
                                            loss=loss_excel,
+                                           itr_to_excel=itr_to_excel,
                                            lr=LR * (0.90 ** (itr // itr_to_lr)))
             f.save(excel_save)
+            loss_excel = [0] * loss_num
     optimizer.step()
     optimizer.zero_grad()
-    # 验证集的损失计算
-    val_ed_ssim_loss = 0
-    val_ed_l2_loss = 0
-    val_l2_sf_loss = 0
-    val_dehaze_l2_loss = 0
-    val_dehaze_ssim_loss = 0
+    loss_excel = [0] * loss_num
+    val_epoch_loss = 0
     with torch.no_grad():
-        for input_image, gt_image in validation_data_loader:
-            # input_image = item['input_image']
-
-            """
-            input_image = input_image.cuda()
-            gt_image = gt_image.cuda()
-            output_image, gt_scene_feature = net(gt_image)
-            hazy_scene_feature = net.encoder(input_image)
-            l2 = l2_loss(output_image, gt_image)
-            l2_sf = l2_loss(gt_scene_feature, hazy_scene_feature)
-            ssim = ssim_loss(output_image, gt_image)
-            loss = ssim + l2 + l2_sf
-            """
-
+        for input_image, gt_image in val_data_loader:
             input_image = input_image.cuda()
             gt_image = gt_image.cuda()
             output_image, gt_scene_feature = net(gt_image)
             dehaze_image, hazy_scene_feature = net(input_image)
-            val_ed_ssim_loss += ssim_loss(output_image, gt_image).item()
-            val_ed_l2_loss += l2_loss(output_image, gt_image).item()
-            val_l2_sf_loss += l2_loss(gt_scene_feature, hazy_scene_feature).item()
-            val_dehaze_l2_loss += l2_loss(output_image, dehaze_image).item()
-            val_dehaze_ssim_loss += ssim_loss(output_image, dehaze_image).item()
+            loss_train, loss_ob = loss_function(
+                [gt_image, output_image, gt_scene_feature, dehaze_image, hazy_scene_feature])
+            temp = loss_train.item()
+            for x in loss_ob.item():
+                temp.append(x)
+            for x in temp:
+                loss_excel += temp
     train_epo_loss = train_epo_loss / len(train_data_loader)
-    val_ed_ssim_loss = val_ed_ssim_loss / len(validation_data_loader)
-    val_ed_l2_loss = val_ed_l2_loss / len(validation_data_loader)
-    val_l2_sf_loss = val_l2_sf_loss / len(validation_data_loader)
-    val_dehaze_l2_loss = val_dehaze_l2_loss / len(validation_data_loader)
-    val_dehaze_ssim_loss = val_dehaze_ssim_loss / len(validation_data_loader)
+    for x in range(len(loss_excel)):
+        loss_excel[x] = loss_excel[x] / len(val_data_loader)
+        val_epoch_loss += loss_excel[x]
     print('\nepoch %d train loss = %.5f' % (epoch + 1, train_epo_loss))
-    print('epoch %d val_ed_ssim_loss = %.5f' % (epoch + 1, val_ed_ssim_loss))
-    print('epoch %d val_ed_l2_loss = %.5f' % (epoch + 1, val_ed_l2_loss))
-    print('epoch %d val_l2_sf_loss = %.5f' % (epoch + 1, val_l2_sf_loss))
-    print('epoch %d validation loss = %.5f' % (epoch + 1, alpha * val_ed_ssim_loss + val_ed_l2_loss + val_l2_sf_loss))
-    print('epoch %d dehaze l2 loss = %.5f' % (epoch + 1, val_dehaze_l2_loss))
-    print('epoch %d dehaze ssim loss = %.5f' % (epoch + 1, val_dehaze_ssim_loss))
+    print('dehaze_l2_loss=%.5f\n'
+          'dehaze_ssim_loss=%.5f\n'
+          're_l2_loss=%.5f\n'
+          're_ssim_loss=%.5f\n'
+          'l2_sf_loss=%.5f' % (
+              loss_excel[0],
+              loss_excel[1],
+              loss_excel[2],
+              loss_excel[3],
+              loss_excel[4]))
     # val=["EPOCH", "L2_LOSS", "SSIM_LOSS", "LOSS", "PSNR", "SSIM", "LR"]
     # (sheet, data_type, line, epoch, itr, l2_loss, ssim_loss, loss, psnr, ssim, lr)
     excel_val_line = write_excel(sheet=sheet_val,
@@ -197,22 +175,16 @@ for epoch in range(EPOCH):
                                  line=excel_val_line,
                                  epoch=epoch,
                                  itr=False,
-                                 l2_loss=val_ed_l2_loss,
-                                 ssim_loss=val_ed_ssim_loss,
-                                 l2_sf_loss=val_l2_sf_loss,
-                                 dehaze_ssim_loss=val_dehaze_ssim_loss,
-                                 dehaze_l2_loss=val_dehaze_l2_loss,
-                                 loss=alpha * val_ed_ssim_loss + val_ed_l2_loss + val_l2_sf_loss,
+                                 loss=loss_excel,
+                                 itr_to_excel=itr_to_excel,
                                  lr=LR * (0.90 ** (itr // itr_to_lr)))
     f.save(excel_save)
     # if alpha * val_ssim_loss + val_l2_loss < min_loss:
-    if alpha * val_ed_ssim_loss + val_l2_sf_loss + val_ed_l2_loss < min_loss:
-        min_loss = alpha * val_ed_ssim_loss + val_l2_sf_loss + val_ed_l2_loss
+    if val_epoch_loss < min_loss:
+        min_loss = val_epoch_loss
         min_epoch = epoch
         torch.save(net, save_path)
         print('saving the epoch %d model with %.5f' % (epoch + 1, min_loss))
-        # no_update = 0
-        # LR_flag = 0
     else:
         print('not improve for epoch %d with %.5f' % (min_epoch, min_loss))
     print('learning rate is ' + str(LR) + '\n')

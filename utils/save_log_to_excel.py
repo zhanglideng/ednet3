@@ -12,7 +12,7 @@ def set_style(name, height, bold=False):
     return style
 
 
-def write_excel(sheet, data_type, line, epoch, itr, loss, lr):
+def write_excel(sheet, data_type, line, epoch, itr, loss, itr_to_excel, lr):
     # 在train页中保留train的数据，在validation页中保留validation的数据
     # 通过excel保存训练结果（训练集验证集loss，学习率，训练时间，总训练时间]
     """
@@ -22,27 +22,27 @@ def write_excel(sheet, data_type, line, epoch, itr, loss, lr):
     :param epoch:
     :param itr:
     :param loss:
+    :param itr_to_excel:
     :param lr:
     :return:
     train=["EPOCH", "ITR", "L2_LOSS", "SSIM_LOSS", "LOSS", "LR"]
     val=["EPOCH", "L2_LOSS", "SSIM_LOSS", "LOSS", "PSNR", "SSIM", "LR"]
     """
+    sum_loss = 0
     if data_type == 'train':
         sheet.write(line, 0, epoch + 1)
         sheet.write(line, 1, itr + 1)
-        sheet.write(line, 2, round(l2_loss, 3))
-        sheet.write(line, 3, round(ssim_loss, 3))
-        sheet.write(line, 4, round(l2_sf_loss, 3))
-        sheet.write(line, 5, round(loss, 3))
-        sheet.write(line, 6, lr)
+        for i in range(5):
+            sheet.write(line, i + 2, round(loss[i] / itr_to_excel, 4))
+            sum_loss += loss[i]
+        sheet.write(line, 6, round(sum_loss) / itr_to_excel, 4)
+        sheet.write(line, 7, lr)
     else:
         sheet.write(line, 0, epoch + 1)
-        sheet.write(line, 1, round(l2_loss, 3))
-        sheet.write(line, 2, round(ssim_loss, 3))
-        sheet.write(line, 3, round(l2_sf_loss, 3))
-        sheet.write(line, 4, round(dehaze_l2_loss, 3))
-        sheet.write(line, 5, round(dehaze_ssim_loss, 3))
-        sheet.write(line, 6, round(loss, 3))
+        for i in range(5):
+            sheet.write(line, i + 2, round(loss[i], 4))
+            sum_loss += loss[i]
+        sheet.write(line, 6, round(sum_loss), 4)
         sheet.write(line, 7, lr)
     return line + 1
 
