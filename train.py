@@ -86,15 +86,6 @@ for epoch in range(EPOCH):
             [gt_image, output_image, gt_scene_feature, dehaze_image, hazy_scene_feature])
         for x in loss_train:
             loss += x
-        '''
-        l2 = l2_loss(output_image, gt_image)
-        l2_sf = l2_loss(gt_scene_feature, hazy_scene_feature)
-        ssim = ssim_loss(output_image, gt_image)
-        loss = ssim + l2 + l2_sf
-        l2_loss_excel += l2.item()
-        l2_sf_loss_excel += l2_sf.item()
-        ssim_loss_excel += ssim.item()
-        '''
         temp = loss_train.item()
         for x in loss_ob.item():
             temp.append(x)
@@ -168,8 +159,6 @@ for epoch in range(EPOCH):
               loss_excel[2],
               loss_excel[3],
               loss_excel[4]))
-    # val=["EPOCH", "L2_LOSS", "SSIM_LOSS", "LOSS", "PSNR", "SSIM", "LR"]
-    # (sheet, data_type, line, epoch, itr, l2_loss, ssim_loss, loss, psnr, ssim, lr)
     excel_val_line = write_excel(sheet=sheet_val,
                                  data_type='val',
                                  line=excel_val_line,
@@ -179,7 +168,6 @@ for epoch in range(EPOCH):
                                  itr_to_excel=itr_to_excel,
                                  lr=LR * (0.90 ** (itr // itr_to_lr)))
     f.save(excel_save)
-    # if alpha * val_ssim_loss + val_l2_loss < min_loss:
     if val_epoch_loss < min_loss:
         min_loss = val_epoch_loss
         min_epoch = epoch
