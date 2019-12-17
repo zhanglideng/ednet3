@@ -12,8 +12,7 @@ def set_style(name, height, bold=False):
     return style
 
 
-def write_excel(sheet, data_type, line, epoch, itr, l2_loss, ssim_loss, l2_sf_loss, dehaze_l2_loss, dehaze_ssim_loss,
-                loss, lr):
+def write_excel(sheet, data_type, line, epoch, itr, loss, lr):
     # 在train页中保留train的数据，在validation页中保留validation的数据
     # 通过excel保存训练结果（训练集验证集loss，学习率，训练时间，总训练时间]
     """
@@ -22,11 +21,6 @@ def write_excel(sheet, data_type, line, epoch, itr, l2_loss, ssim_loss, l2_sf_lo
     :param line:
     :param epoch:
     :param itr:
-    :param l2_loss:
-    :param ssim_loss:
-    :param l2_sf_loss:
-    :param dehaze_l2_loss:
-    :param dehaze_ssim_loss:
     :param loss:
     :param lr:
     :return:

@@ -23,6 +23,7 @@ alpha = 1  # 损失函数的权重
 accumulation_steps = 1  # 梯度积累的次数，类似于batch-size=64
 itr_to_lr = 10000 // BATCH_SIZE  # 训练10000次后损失下降50%
 itr_to_excel = 64 // BATCH_SIZE  # 训练64次后保存相关数据到excel
+loss_num = 5  # 包括参加训练和不参加训练的loss
 train_haze_path = '/input/data/nyu/train/'  # 去雾训练集的路径
 val_haze_path = '/input/data/nyu/val/'  # 去雾验证集的路径
 gt_path = '/input/data/nyu/gth/'
@@ -54,12 +55,12 @@ transform = transforms.Compose([transforms.ToTensor()])
 # 读取训练集数据
 train_path_list = [train_haze_path, gt_path]
 train_data = EdDataSet(transform, train_path_list)
-train_data_loader = DataLoader(train_data, batch_size=BATCH_SIZE, shuffle=True, num_workers=8)
+train_data_loader = DataLoader(train_data, batch_size=BATCH_SIZE, shuffle=True, num_workers=4)
 
 # 读取验证集数据
 val_path_list = [val_haze_path, gt_path]
 validation_data = EdDataSet(transform, val_path_list)
-validation_data_loader = DataLoader(validation_data, batch_size=BATCH_SIZE, shuffle=True, num_workers=8)
+validation_data_loader = DataLoader(validation_data, batch_size=BATCH_SIZE, shuffle=True, num_workers=4)
 
 # 定义优化器
 optimizer = torch.optim.Adam(net.parameters(), lr=LR, weight_decay=1e-5)
@@ -68,22 +69,35 @@ min_loss = 999999999
 min_epoch = 0
 itr = 0
 start_time = time.time()
+
 # 开始训练
 print("\nstart to train!")
 for epoch in range(EPOCH):
     index = 0
     train_epo_loss = 0
     validation_epo_loss = 0
+    '''
     l2_loss_excel = 0
     l2_sf_loss_excel = 0
     ssim_loss_excel = 0
+    '''
+    loss = 0
+    loss_excel = [0] * loss_num
+    """
+    创建一个可以
+    """
     for input_image, gt_image in train_data_loader:
         index += 1
         itr += 1
         input_image = input_image.cuda()
         gt_image = gt_image.cuda()
         output_image, gt_scene_feature = net(gt_image)
-        hazy_scene_feature = net.encoder(input_image)
+        dehaze_image, hazy_scene_feature = net(input_image)
+        loss_train, loss_ob = loss_function(
+            [gt_image, output_image, gt_scene_feature, dehaze_image, hazy_scene_feature])
+        for x in loss_train:
+            loss += x
+        '''
         l2 = l2_loss(output_image, gt_image)
         l2_sf = l2_loss(gt_scene_feature, hazy_scene_feature)
         ssim = ssim_loss(output_image, gt_image)
@@ -91,6 +105,12 @@ for epoch in range(EPOCH):
         l2_loss_excel += l2.item()
         l2_sf_loss_excel += l2_sf.item()
         ssim_loss_excel += ssim.item()
+        '''
+        temp = loss_train.item()
+        for x in loss_ob.item():
+            temp.append(x)
+        for x in temp:
+            loss_excel += temp
         loss.backward()
         # optimizer.step()
         iter_loss = loss.item()
@@ -103,31 +123,28 @@ for epoch in range(EPOCH):
             # optimizer the net
             optimizer.step()  # update parameters of net
             optimizer.zero_grad()  # reset gradient
+            loss = 0
         if np.mod(index, itr_to_excel) == 0:
-            # print(index)
-            # print(itr_to_excel)
-            print('epoch %d, %03d/%d, l2_loss=%.5f, ssim_loss=%.5f, l2_sf_loss=%.5f' % (
-                epoch + 1, index, len(train_data_loader), l2_loss_excel / itr_to_excel, ssim_loss_excel / itr_to_excel,
-                l2_sf_loss_excel / itr_to_excel))
+            print('epoch %d, %03d/%d' % (epoch + 1, index, len(train_data_loader)))
+            print('dehaze_l2_loss=%.5f\n'
+                  'dehaze_ssim_loss=%.5f\n'
+                  're_l2_loss=%.5f\n'
+                  're_ssim_loss=%.5f\n'
+                  'l2_sf_loss=%.5f' % (
+                      loss_excel[0] / itr_to_excel,
+                      loss_excel[1] / itr_to_excel,
+                      loss_excel[2] / itr_to_excel,
+                      loss_excel[3] / itr_to_excel,
+                      loss_excel[4] / itr_to_excel))
             print_time(start_time, index, EPOCH, len(train_data_loader), epoch)
-            # train=["EPOCH", "ITR", "L2_LOSS", "SSIM_LOSS", "LOSS", "LR"]
-            # (sheet, data_type, line, epoch, itr, l2_loss, ssim_loss, loss, psnr, ssim, lr)
             excel_train_line = write_excel(sheet=sheet_train,
                                            data_type='train',
                                            line=excel_train_line,
                                            epoch=epoch,
                                            itr=itr,
-                                           l2_loss=l2_loss_excel / itr_to_excel,
-                                           ssim_loss=ssim_loss_excel / itr_to_excel,
-                                           l2_sf_loss=l2_sf_loss_excel / itr_to_excel,
-                                           dehaze_l2_loss=False,
-                                           dehaze_ssim_loss=False,
-                                           loss=(ssim_loss_excel + l2_loss_excel + l2_sf_loss_excel) / itr_to_excel,
+                                           loss=loss_excel,
                                            lr=LR * (0.90 ** (itr // itr_to_lr)))
             f.save(excel_save)
-            l2_loss_excel = 0
-            ssim_loss_excel = 0
-            l2_sf_loss_excel = 0
     optimizer.step()
     optimizer.zero_grad()
     # 验证集的损失计算
