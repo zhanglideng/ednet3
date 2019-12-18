@@ -16,8 +16,8 @@ import torch
 from utils.loss import *
 from utils.ssim import *
 
-test_path = './temp/'
-gth_path = './dehaze_data/gth/'
+test_path = '/input/data/nyu/test_visual/'
+gth_path = '/input/data/nyu/gth/'
 BATCH_SIZE = 4
 mean = [0.489, 0.490, 0.491]
 std = [0.312, 0.312, 0.312]
@@ -91,7 +91,7 @@ for input_image, gt_image in test_data_loader:
     # print(">>Processing ./{}".format(str(count)))
     for i in range(BATCH_SIZE):
         im_output_for_save = get_image_for_save(output_image[i])
-        filename = str(count*BATCH_SIZE+i) + '.bmp'
+        filename = str((count-1)*BATCH_SIZE+i) + '.bmp'
         cv2.imwrite(os.path.join(save_path, filename), im_output_for_save)
 
 print(">>Finished!"

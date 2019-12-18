@@ -24,7 +24,7 @@ accumulation_steps = 1  # 梯度积累的次数，类似于batch-size=64
 itr_to_lr = 10000 // BATCH_SIZE  # 训练10000次后损失下降50%
 itr_to_excel = 64 // BATCH_SIZE  # 训练64次后保存相关数据到excel
 loss_num = 5  # 包括参加训练和不参加训练的loss
-train_haze_path = '/input/data/nyu/train/'  # 去雾训练集的路径
+train_haze_path = '/input/data/nyu/val/'  # 去雾训练集的路径
 val_haze_path = '/input/data/nyu/val/'  # 去雾验证集的路径
 gt_path = '/input/data/nyu/gth/'
 save_path = './checkpoints/best_cnn_model.pt'  # 保存模型的路径
@@ -84,13 +84,23 @@ for epoch in range(EPOCH):
         dehaze_image, hazy_scene_feature = net(input_image)
         loss_train, loss_ob = loss_function(
             [gt_image, output_image, gt_scene_feature, dehaze_image, hazy_scene_feature])
+        '''
+        print('loss_train')
+        print(loss_train)
+        print('loss_ob')
+        print(loss_ob)'''
+        temp = []
         for x in loss_train:
             loss += x
-        temp = loss_train.item()
-        for x in loss_ob.item():
-            temp.append(x)
-        for x in temp:
-            loss_excel += temp
+            temp.append(x.item())
+        for x in loss_ob:
+            temp.append(x.item())
+        for x in range(len(temp)):
+            loss_excel[x] += temp[x]
+        '''print('loss')
+        print(loss)
+        print('loss_excel')
+        print(loss_excel)'''
         loss.backward()
         # optimizer.step()
         iter_loss = loss.item()
@@ -139,11 +149,13 @@ for epoch in range(EPOCH):
             dehaze_image, hazy_scene_feature = net(input_image)
             loss_train, loss_ob = loss_function(
                 [gt_image, output_image, gt_scene_feature, dehaze_image, hazy_scene_feature])
-            temp = loss_train.item()
+            temp = []
+            for x in loss_train:
+                temp.append(x.item())
             for x in loss_ob.item():
                 temp.append(x)
-            for x in temp:
-                loss_excel += temp
+            for x in range(len(temp)):
+                loss_excel[x] += temp[x]
     train_epo_loss = train_epo_loss / len(train_data_loader)
     for x in range(len(loss_excel)):
         loss_excel[x] = loss_excel[x] / len(val_data_loader)

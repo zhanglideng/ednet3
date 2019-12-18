@@ -19,5 +19,5 @@ def loss_function(image):
                   ssim_loss(gt_image, dehaze_image),
                   l2_loss(gt_image, output_image),
                   ssim_loss(gt_image, output_image)]
-    loss_ob = l2_loss(gt_scene_feature, hazy_scene_feature)
+    loss_ob = [l2_loss(gt_scene_feature, hazy_scene_feature)]
     return loss_train, loss_ob
