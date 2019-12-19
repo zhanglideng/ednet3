@@ -152,8 +152,8 @@ for epoch in range(EPOCH):
             temp = []
             for x in loss_train:
                 temp.append(x.item())
-            for x in loss_ob.item():
-                temp.append(x)
+            for x in loss_ob:
+                temp.append(x.item())
             for x in range(len(temp)):
                 loss_excel[x] += temp[x]
     train_epo_loss = train_epo_loss / len(train_data_loader)
