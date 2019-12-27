@@ -8,7 +8,7 @@ from utils.loss import *
 from utils.print_time import *
 from utils.save_log_to_excel import *
 from dataloader import EdDataSet
-from Res_ED_model import CNN
+from Res_ED_model import *
 import time
 import xlwt
 from utils.ms_ssim import *
@@ -24,9 +24,10 @@ accumulation_steps = 1  # 梯度积累的次数，类似于batch-size=64
 itr_to_lr = 10000 // BATCH_SIZE  # 训练10000次后损失下降50%
 itr_to_excel = 64 // BATCH_SIZE  # 训练64次后保存相关数据到excel
 loss_num = 5  # 包括参加训练和不参加训练的loss
-train_haze_path = '/input/data/nyu/val/'  # 去雾训练集的路径
+train_haze_path = '/input/data/nyu/train/'  # 去雾训练集的路径
 val_haze_path = '/input/data/nyu/val/'  # 去雾验证集的路径
 gt_path = '/input/data/nyu/gth/'
+t_path = '/input/data/nyu/depth/'
 save_path = './checkpoints/best_cnn_model.pt'  # 保存模型的路径
 excel_save = './result.xls'  # 保存excel的路径
 
@@ -51,12 +52,12 @@ for param in net.decoder.parameters():
 # 数据转换模式
 transform = transforms.Compose([transforms.ToTensor()])
 # 读取训练集数据
-train_path_list = [train_haze_path, gt_path]
+train_path_list = [train_haze_path, gt_path, t_path]
 train_data = EdDataSet(transform, train_path_list)
 train_data_loader = DataLoader(train_data, batch_size=BATCH_SIZE, shuffle=True, num_workers=4)
 
 # 读取验证集数据
-val_path_list = [val_haze_path, gt_path]
+val_path_list = [val_haze_path, gt_path, t_path]
 val_data = EdDataSet(transform, val_path_list)
 val_data_loader = DataLoader(val_data, batch_size=BATCH_SIZE, shuffle=True, num_workers=4)
 
@@ -75,13 +76,15 @@ for epoch in range(EPOCH):
     train_epo_loss = 0
     loss = 0
     loss_excel = [0] * loss_num
-    for input_image, gt_image in train_data_loader:
+    for input_image, gt_image, gt_t, haze_t in train_data_loader:
         index += 1
         itr += 1
         input_image = input_image.cuda()
         gt_image = gt_image.cuda()
-        output_image, gt_scene_feature = net(gt_image)
-        dehaze_image, hazy_scene_feature = net(input_image)
+        gt_t = gt_t.cuda()
+        haze_t = haze_t.cuda()
+        output_image, gt_scene_feature = net(gt_image, gt_t)
+        dehaze_image, hazy_scene_feature = net(input_image, haze_t)
         loss_train, loss_ob = loss_function(
             [gt_image, output_image, gt_scene_feature, dehaze_image, hazy_scene_feature])
         '''
@@ -142,11 +145,13 @@ for epoch in range(EPOCH):
     loss_excel = [0] * loss_num
     val_epoch_loss = 0
     with torch.no_grad():
-        for input_image, gt_image in val_data_loader:
+        for input_image, gt_image, gt_t, haze_t in val_data_loader:
             input_image = input_image.cuda()
             gt_image = gt_image.cuda()
-            output_image, gt_scene_feature = net(gt_image)
-            dehaze_image, hazy_scene_feature = net(input_image)
+            gt_t = gt_t.cuda()
+            haze_t = haze_t.cuda()
+            output_image, gt_scene_feature = net(gt_image, gt_t)
+            dehaze_image, hazy_scene_feature = net(input_image, haze_t)
             loss_train, loss_ob = loss_function(
                 [gt_image, output_image, gt_scene_feature, dehaze_image, hazy_scene_feature])
             temp = []

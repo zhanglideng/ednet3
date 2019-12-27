@@ -4,6 +4,7 @@ import torch.utils.model_zoo as model_zoo
 from collections import OrderedDict
 import torchvision.models as models
 from torch.autograd import Variable
+import torch.nn.functional as F
 
 
 class ResBlock(nn.Module):
@@ -40,9 +41,9 @@ class EnCoder(nn.Module):
     def __init__(self, k):
         super(EnCoder, self).__init__()
         self.k = k
-        self.conv1 = nn.Conv2d(3, 64, kernel_size=5, stride=2, padding=2, bias=False)
-        self.conv2 = nn.Conv2d(64, 128, kernel_size=5, stride=2, padding=2, bias=False)
-        self.conv3 = nn.Conv2d(128, k + 1, kernel_size=5, stride=2, padding=2, bias=False)
+        self.conv1 = nn.Conv2d(4, 64, kernel_size=5, stride=2, padding=2, bias=False)
+        self.conv2 = nn.Conv2d(65, 128, kernel_size=5, stride=2, padding=2, bias=False)
+        self.conv3 = nn.Conv2d(129, k + 1, kernel_size=5, stride=2, padding=2, bias=False)
         self.relu = nn.PReLU()
         self.d_res_block = D_ResBlock()
 
@@ -50,10 +51,13 @@ class EnCoder(nn.Module):
         self.bn128 = nn.BatchNorm2d(128)
         self.bn65 = nn.BatchNorm2d(65)
 
-    def forward(self, x):
+    def forward(self, x, t):
         # print(x.shape)
+        x = torch.cat([x, t], 1)
         x = self.relu(self.bn64(self.conv1(x)))
         # print(x.shape)
+        t = F.avg_pool2d(t, 2)
+        x = torch.cat([x, t], 1)
         x = self.relu(self.bn128(self.conv2(x)))
         # print(x.shape)
         x1 = self.d_res_block(x)
@@ -64,6 +68,8 @@ class EnCoder(nn.Module):
         x1 = self.d_res_block(x1)
         x1 = x1 + x
         # print(x1.shape)
+        t = F.avg_pool2d(t, 2)
+        x1 = torch.cat([x1, t], 1)
         x2 = self.bn65(self.conv3(x1))
         # print(x2.shape)
         indices_map = torch.LongTensor([self.k]).cuda()
@@ -116,7 +122,7 @@ class CNN(nn.Module):
         self.encoder = EnCoder(k)
         self.decoder = DeCoder()
 
-    def forward(self, x):
-        x = self.encoder(x)
+    def forward(self, x, t):
+        x = self.encoder(x, t)
         x1 = self.decoder(x)
         return x1, x

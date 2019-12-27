@@ -11,13 +11,15 @@ class EdDataSet(Dataset):
     def __init__(self, transform1, path=None):
         print(path)
         self.transform1 = transform1
-        self.haze_path, self.gt_path = path
+        self.haze_path, self.gt_path, self.t_path = path
         # self.haze_path, self.gt_path, self.depth_path = path
         self.haze_data_list = os.listdir(self.haze_path)
         self.gt_data_list = os.listdir(self.gt_path)
+        self.t_data_list = os.listdir(self.t_path)
         # self.gt_depth_list = os.listdir(self.depth_path)
         self.haze_data_list.sort(key=lambda x: int(x[:-30]))
         self.gt_data_list.sort(key=lambda x: int(x[:-4]))
+        self.t_data_list.sort(key=lambda x: int(x[:-4]))
 
     def __len__(self):
         return len(os.listdir(self.haze_path))
@@ -32,9 +34,16 @@ class EdDataSet(Dataset):
             (大气光)
         """
         haze_image_name = self.haze_data_list[idx]
-        haze_image = cv2.imread(self.haze_path + '/' + haze_image_name)
-        gt_image = cv2.imread(self.gt_path + '/' + haze_image_name[:-30] + '.bmp')
+        haze_image = cv2.imread(self.haze_path + haze_image_name)
+        gt_image = cv2.imread(self.gt_path + haze_image_name[:-30] + '.bmp')
+        t_image = np.load(self.t_path + haze_image_name[:-30] + '.npy')
+        b = float(haze_image_name[-8:-4])
+        t_image = np.expand_dims(t_image, axis=2)
+        t_image = t_image.astype(np.float32)
+        gt_t = np.exp(-1 * 0.00001 * t_image)
+        haze_t = np.exp(-1 * b * t_image)
         # print(gt_image.shape)
+        # print(gt_t.shape)
         # data = sio.loadmat(self.depth_path + '/' + haze_image_name[:-30] + '.mat')
         # gt_depth = data["depths"]
         # gt_depth = gt_depth[:, :, np.newaxis]
@@ -50,11 +59,13 @@ class EdDataSet(Dataset):
         if self.transform1:
             haze_image = self.transform1(haze_image)
             gt_image = self.transform1(gt_image)
+            gt_t = self.transform1(gt_t)
+            haze_t = self.transform1(haze_t)
         # if self.transform2:
         #    gt_depth = self.transform2(gt_depth)
         #    haze_depth = self.transform2(haze_depth)
         # 暂不传递大气光值
-        return haze_image, gt_image
+        return haze_image, gt_image, gt_t, haze_t
 
 
 if __name__ == '__main__':
