@@ -11,6 +11,7 @@
       <w>relu</w>
       <w>resblock</w>
       <w>ssim</w>
+      <w>uint</w>
     </words>
   </dictionary>
 </component>
