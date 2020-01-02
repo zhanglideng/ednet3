@@ -40,7 +40,7 @@ class EdDataSet(Dataset):
         b = float(haze_image_name[-8:-4])
         t_image = np.expand_dims(t_image, axis=2)
         t_image = t_image.astype(np.float32)
-        gt_t = np.exp(-1 * 0.00001 * t_image)
+        gt_t = np.exp(-1 * 0.01 * t_image)
         haze_t = np.exp(-1 * b * t_image)
         # print(gt_image.shape)
         # print(gt_t.shape)

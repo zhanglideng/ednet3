@@ -52,7 +52,8 @@ def init_excel():
     sheet1 = workbook.add_sheet('train', cell_overwrite_ok=True)
     sheet2 = workbook.add_sheet('val', cell_overwrite_ok=True)
     # 通过excel保存训练结果（训练集验证集loss，学习率，训练时间，总训练时间）
-    row0 = ["EPOCH", "ITR", "dehaze_l2_loss", "dehaze_ssim_loss", "re_l2_loss", "re_ssim_loss", "l2_sf_loss","loss","LR"]
+    row0 = ["EPOCH", "ITR", "dehaze_l2_loss", "dehaze_ssim_loss", "re_l2_loss", "re_ssim_loss", "l2_sf_loss", "loss",
+            "LR"]
     row1 = ["EPOCH", "dehaze_l2_loss", "dehaze_ssim_loss", "re_l2_loss", "re_ssim_loss", "l2_sf_loss", "LOSS", "LR"]
     for i in range(0, len(row0)):
         print('写入train_excel')
