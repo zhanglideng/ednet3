@@ -17,7 +17,9 @@ class EdDataSet(Dataset):
         self.gt_data_list = os.listdir(self.gt_path)
         self.t_data_list = os.listdir(self.t_path)
         # self.gt_depth_list = os.listdir(self.depth_path)
+        self.haze_data_list.sort(key=lambda x: float(x[-8:-4]))
         self.haze_data_list.sort(key=lambda x: int(x[:-30]))
+        print(self.haze_data_list)
         self.gt_data_list.sort(key=lambda x: int(x[:-4]))
         self.t_data_list.sort(key=lambda x: int(x[:-4]))
 

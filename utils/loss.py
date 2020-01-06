@@ -1,6 +1,21 @@
 import torch
 from utils.ms_ssim import *
 
+'''
+def color_loss(image, label, len_reg=0):
+    
+    vec1 = tf.reshape(image, [-1, 3])
+    vec2 = tf.reshape(label, [-1, 3])
+    clip_value = 0.999999
+    norm_vec1 = tf.nn.l2_normalize(vec1, 1)
+    norm_vec2 = tf.nn.l2_normalize(vec2, 1)
+    dot = tf.reduce_sum(norm_vec1*norm_vec2, 1)
+    dot = tf.clip_by_value(dot, -clip_value, clip_value)
+    angle = tf.acos(dot) * (180/math.pi)
+
+    return tf.reduce_mean(angle)
+'''
+
 
 def l2_loss(input_image, output_image):
     l2_loss_fn = torch.nn.MSELoss(reduction='mean').cuda()
@@ -18,6 +33,7 @@ def loss_function(image):
     loss_train = [l2_loss(gt_image, dehaze_image),
                   ssim_loss(gt_image, dehaze_image),
                   l2_loss(gt_image, output_image),
-                  ssim_loss(gt_image, output_image)]
-    loss_ob = [l2_loss(gt_scene_feature, hazy_scene_feature)]
+                  ssim_loss(gt_image, output_image),
+                  l2_loss(gt_scene_feature, hazy_scene_feature)]
+    loss_ob = []
     return loss_train, loss_ob

@@ -24,8 +24,8 @@ accumulation_steps = 1  # 梯度积累的次数，类似于batch-size=64
 itr_to_lr = 10000 // BATCH_SIZE  # 训练10000次后损失下降50%
 itr_to_excel = 64 // BATCH_SIZE  # 训练64次后保存相关数据到excel
 loss_num = 5  # 包括参加训练和不参加训练的loss
-train_haze_path = '/input/data/shallow_nyu/train/'  # 去雾训练集的路径
-val_haze_path = '/input/data/shallow_nyu/val/'  # 去雾验证集的路径
+train_haze_path = '/input/data/nyu/train/'  # 去雾训练集的路径
+val_haze_path = '/input/data/nyu/val/'  # 去雾验证集的路径
 gt_path = '/input/data/nyu/gth/'
 t_path = '/input/data/nyu/depth/'
 save_path = './checkpoints/best_cnn_model.pt'  # 保存模型的路径
