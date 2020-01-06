@@ -31,13 +31,13 @@ t_path = '/input/data/nyu/depth/'
 save_path = './checkpoints/best_cnn_model.pt'  # 保存模型的路径
 excel_save = './result.xls'  # 保存excel的路径
 
-
+'''
 def adjust_learning_rate(op, i):
     """Sets the learning rate to the initial LR decayed by 10 every 30 epochs"""
     lr = LR * (0.90 ** (i // itr_to_lr))
     for param_group in op.param_groups:
         param_group['lr'] = lr
-
+'''
 
 # 初始化excel
 f, sheet_train, sheet_val = init_excel()
@@ -109,8 +109,10 @@ for epoch in range(EPOCH):
         iter_loss = loss.item()
         train_epo_loss += iter_loss
         loss = loss / accumulation_steps
+        '''
         if itr % itr_to_lr == 0:
             adjust_learning_rate(optimizer, itr)
+        '''
         # 3. update parameters of net
         if ((index + 1) % accumulation_steps) == 0:
             # optimizer the net
