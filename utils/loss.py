@@ -1,20 +1,7 @@
 import torch
 from utils.ms_ssim import *
-
-'''
-def color_loss(image, label, len_reg=0):
-    
-    vec1 = tf.reshape(image, [-1, 3])
-    vec2 = tf.reshape(label, [-1, 3])
-    clip_value = 0.999999
-    norm_vec1 = tf.nn.l2_normalize(vec1, 1)
-    norm_vec2 = tf.nn.l2_normalize(vec2, 1)
-    dot = tf.reduce_sum(norm_vec1*norm_vec2, 1)
-    dot = tf.clip_by_value(dot, -clip_value, clip_value)
-    angle = tf.acos(dot) * (180/math.pi)
-
-    return tf.reduce_mean(angle)
-'''
+import math
+import torch.nn.functional
 
 
 def l2_loss(input_image, output_image):
@@ -26,6 +13,19 @@ def ssim_loss(input_image, output_image):
     losser = MS_SSIM(max_val=1)
     # losser = MS_SSIM(data_range=1.).cuda()
     return (1 - losser(input_image, output_image)) * 100
+
+
+def color_loss(input_image, output_image):
+    vec1 = input_image.view([-1, 3])
+    vec2 = output_image.view([-1, 3])
+    clip_value = 0.999999
+    norm_vec1 = torch.nn.functional.normalize(vec1)
+    norm_vec2 = torch.nn.functional.normalize(vec2)
+    dot = norm_vec1 * norm_vec2
+    dot = dot.mean(dim=1)
+    dot = torch.clamp(dot, -clip_value, clip_value)
+    angle = torch.acos(dot) * (180 / math.pi)
+    return angle.mean()
 
 
 def loss_function(image):

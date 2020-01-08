@@ -40,10 +40,10 @@ def write_excel(sheet, data_type, line, epoch, itr, loss, itr_to_excel, lr):
     else:
         sheet.write(line, 0, epoch + 1)
         for i in range(5):
-            sheet.write(line, i + 2, round(loss[i], 4))
+            sheet.write(line, i + 1, round(loss[i], 4))
             sum_loss += loss[i]
-        sheet.write(line, 7, round(sum_loss, 4))
-        sheet.write(line, 8, lr)
+        sheet.write(line, 6, round(sum_loss, 4))
+        sheet.write(line, 7, lr)
     return line + 1
 
 
