@@ -72,7 +72,7 @@ class EnCoder(nn.Module):
         x1 = x1 + x
         # print(x1.shape)
         t = F.avg_pool2d(t, 2)
-        a = a.avg_pool2d(a, 2)
+        a = F.avg_pool2d(a, 2)
         x1 = torch.cat([x1, a], 1)
         x1 = torch.cat([x1, t], 1)
         x2 = self.bn65(self.conv3(x1))
@@ -411,6 +411,6 @@ class CNN(nn.Module):
 
     def forward(self, x):
         A, t = self.At(x)
-        x = self.encoder(x, A, t)
+        x = self.encoder(x, a, t)
         x1 = self.decoder(x)
         return x1, x
